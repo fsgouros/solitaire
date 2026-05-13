@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="index.js"></script>
+    <title>Solitaire</title>
+  </head>
+  <body>
+    <h1>Klondike Solitaire</h1>
+    <div class="game-container">
+      <!-- Top Section: Stock, Waste, and 4 Foundations -->
+      <div class="top-bar">
+        <div class="stock-pile" id="stock">Stock</div>
+        <div class="waste-pile" id="waste">Waste</div>
+        <div class="spacer"></div>
+        <!-- Gap between waste and foundations -->
+        <div class="foundation" id="f-1"></div>
+        <div class="foundation" id="f-2"></div>
+        <div class="foundation" id="f-3"></div>
+        <div class="foundation" id="f-4"></div>
+      </div>
+
+      <!-- Bottom Section: The 7 Tableau Stacks -->
+      <div class="tableau">
+        <div class="stack" id="t-1"></div>
+        <div class="stack" id="t-2"></div>
+        <div class="stack" id="t-3"></div>
+        <div class="stack" id="t-4"></div>
+        <div class="stack" id="t-5"></div>
+        <div class="stack" id="t-6"></div>
+        <div class="stack" id="t-7"></div>
+      </div>
+    </div>
+  </body>
+</html>
