@@ -1,49 +1,821 @@
-h1{
-    color: teal;
-}
-.board{
-    display: flex;
+/* CSS Variables & Themes */
+:root {
+    /* Emerald Felt Theme (Default) */
+    --bg-gradient: radial-gradient(circle at 50% 30%, #0d5c3a 0%, #063c24 70%, #032214 100%);
+    --bg-glow-color-1: rgba(16, 185, 129, 0.15);
+    --bg-glow-color-2: rgba(4, 120, 87, 0.1);
     
-    background-color: green;
+    /* UI Colors */
+    --panel-bg: rgba(255, 255, 255, 0.07);
+    --panel-border: rgba(255, 255, 255, 0.12);
+    --panel-blur: 16px;
+    
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    
+    --accent: #fbbf24; /* Warm Gold */
+    --accent-glow: rgba(251, 191, 36, 0.3);
+    --success: #34d399;
+    --warning: #fb923c;
+    --danger: #f87171;
+    
+    /* Card Design */
+    --card-width: clamp(48px, 8.8vw, 92px);
+    --card-height: calc(var(--card-width) * 1.4);
+    --card-bg: #ffffff;
+    --card-back-bg: linear-gradient(135deg, #1e1b4b 0%, #311042 50%, #4c0519 100%);
+    --card-border: rgba(0, 0, 0, 0.15);
+    --card-radius: 8px;
+    
+    --card-text-black: #1e293b;
+    --card-text-red: #dc2626;
+    
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.15);
+    --shadow-md: 0 6px 12px rgba(0,0,0,0.25);
+    --shadow-lg: 0 16px 28px rgba(0,0,0,0.4);
+    --shadow-card-drag: 0 25px 40px rgba(0, 0, 0, 0.45);
+    
+    --font-display: 'Outfit', -apple-system, sans-serif;
+    --font-body: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    
+    /* Stacking heights */
+    --stack-offset-down: 14px;
+    --stack-offset-up: 28px;
+}
+
+[data-theme="dark"] {
+    /* Midnight Dark Theme */
+    --bg-gradient: radial-gradient(circle at 50% 30%, #1e2030 0%, #11121a 75%, #090a0f 100%);
+    --bg-glow-color-1: rgba(99, 102, 241, 0.15);
+    --bg-glow-color-2: rgba(139, 92, 246, 0.1);
+    --panel-bg: rgba(255, 255, 255, 0.05);
+    --panel-border: rgba(255, 255, 255, 0.08);
+    --accent: #818cf8; /* Indigo Glow */
+    --accent-glow: rgba(129, 140, 248, 0.3);
+    --card-back-bg: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
+}
+
+/* Reset & Base Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg-gradient);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+
+/* Background Glow Effects */
+.bg-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.bg-glow-1 {
+    width: 60vw;
+    height: 60vw;
+    top: -10vw;
+    left: -10vw;
+    background: var(--bg-glow-color-1);
+}
+
+.bg-glow-2 {
+    width: 50vw;
+    height: 50vw;
+    bottom: -10vw;
+    right: -10vw;
+    background: var(--bg-glow-color-2);
+}
+
+/* App Container */
+.app-container {
     width: 100%;
-    height: 500px;
+    max-width: 1080px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    z-index: 1;
+    position: relative;
 }
 
-/* The main wrapper */
-.game-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  background-color: #2e7d32; /* A nice "poker table" green */
-  padding: 20px;
-  min-height: 100vh;
-  width: 100%;
-  box-sizing: border-box;
+/* Header & HUD */
+.game-header {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(var(--panel-blur));
+    -webkit-backdrop-filter: blur(var(--panel-blur));
+    padding: 14px 24px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: var(--shadow-sm);
 }
 
-/* Common styles for both rows to ensure 7 columns */
-.top-bar, .tableau {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr); /* 7 equal columns */
-  grid-gap: 10px;
-  max-width: 1000px; /* Limits size on ultra-wide screens */
-  margin: 0 auto;    /* Centers the board */
-  width: 100%;
+.logo-area {
+    display: flex;
+    flex-direction: column;
 }
 
-/* Make the stacks look like card slots */
-.stack, .foundation, .stock-pile, .waste-pile {
-  border: 2px dashed rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  height: 150px; /* Placeholder height */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-family: sans-serif;
+.logo-area h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.8rem;
+    line-height: 1;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #ffffff 50%, var(--text-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
-/* Optional: Subtle indicator for empty piles */
-.foundation {
-  background-color: rgba(0, 0, 0, 0.1);
+.logo-area .subtitle {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+.stats-panel {
+    display: flex;
+    gap: 24px;
+}
+
+.stat-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+}
+
+.stat-value {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.3rem;
+    color: var(--text-primary);
+}
+
+/* Status Indicator */
+.status-indicator-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.green {
+    background-color: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+.status-dot.yellow {
+    background-color: var(--warning);
+    box-shadow: 0 0 8px var(--warning);
+}
+
+.status-dot.red {
+    background-color: var(--danger);
+    box-shadow: 0 0 8px var(--danger);
+}
+
+/* Controls */
+.control-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Buttons */
+.btn {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: none;
+    cursor: pointer;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-icon {
+    width: 38px;
+    height: 38px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--panel-border);
+    color: var(--text-primary);
+}
+
+.btn-icon:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.btn-icon:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-icon:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--text-primary);
+    color: #0f172a;
+    padding: 0 18px;
+    height: 38px;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary:hover {
+    background: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    padding: 0 16px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.btn-warning {
+    background: var(--warning);
+    color: #000;
+    padding: 0 16px;
+    height: 34px;
+}
+
+.btn-warning:hover {
+    filter: brightness(1.1);
+}
+
+.btn-large {
+    height: 48px;
+    padding: 0 28px;
+    font-size: 1rem;
+    border-radius: 12px;
+}
+
+.btn-sm {
+    font-size: 0.75rem;
+    padding: 0 12px;
+    height: 30px;
+    border-radius: 6px;
+}
+
+/* Game Board Grid */
+.game-board {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    flex-grow: 1;
+}
+
+.board-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.deck-area, .foundations-area {
+    display: flex;
+    gap: 16px;
+}
+
+/* Piles Containers */
+.pile-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+}
+
+.pile-label, .column-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+/* Piles Base */
+.pile {
+    width: var(--card-width);
+    height: var(--card-height);
+    border-radius: var(--card-radius);
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    position: relative;
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+}
+
+/* Piles specific */
+.pile.highlight-drop {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow), inset 0 4px 10px rgba(0,0,0,0.3);
+    background: rgba(251, 191, 36, 0.05);
+}
+
+/* Suit placeholders for foundations */
+.suit-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.2rem;
+    opacity: 0.12;
+    font-family: var(--font-display);
+}
+
+.suit-placeholder.red { color: #f87171; }
+.suit-placeholder.black { color: #94a3b8; }
+
+/* Tableau Columns Area */
+.tableau-area {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 16px;
+    min-height: calc(var(--card-height) * 3);
+}
+
+.tableau-column-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.tableau-column {
+    width: var(--card-width);
+    min-height: var(--card-height);
+    border-radius: var(--card-radius);
+    position: relative;
+    /* We don't add borders here, but we can add a subtle placeholder dashed outline when empty */
+}
+
+.tableau-column:empty::after {
+    content: '';
+    display: block;
+    width: var(--card-width);
+    height: var(--card-height);
+    border-radius: var(--card-radius);
+    background: rgba(0, 0, 0, 0.15);
+    border: 2px dashed rgba(255, 255, 255, 0.08);
+}
+
+.tableau-column.highlight-drop::after {
+    border-color: var(--accent);
+    background: rgba(251, 191, 36, 0.05);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* --- Card Component Styles --- */
+.card {
+    width: var(--card-width);
+    height: var(--card-height);
+    border-radius: var(--card-radius);
+    position: absolute;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease, top 0.3s ease, left 0.3s ease;
+    touch-action: none; /* Crucial for PointerEvents on mobile */
+}
+
+/* Card face styling */
+.card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: calc(var(--card-radius) - 1px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: var(--card-bg);
+}
+
+/* Card front */
+.card-front {
+    transform: rotateY(0deg);
+}
+
+/* Card back */
+.card-back {
+    transform: rotateY(180deg);
+    background: var(--card-back-bg);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Beautiful Geometric Pattern for Card Back */
+.card-back::before {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border: 1.5px solid rgba(251, 191, 36, 0.4); /* gold border */
+    border-radius: calc(var(--card-radius) - 4px);
+}
+
+.card-back::after {
+    content: '';
+    position: absolute;
+    inset: 10px;
+    background-image: radial-gradient(circle, rgba(251, 191, 36, 0.15) 1px, transparent 1px),
+                      linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.05) 55%, transparent 55%);
+    background-size: 8px 8px, 16px 16px;
+    border-radius: calc(var(--card-radius) - 8px);
+}
+
+/* Card state flipped (face down) */
+.card.face-down {
+    transform: rotateY(180deg);
+    cursor: default;
+}
+
+.card.face-down .card-front {
+    pointer-events: none;
+}
+
+/* Card suit coloring */
+.card[data-suit="H"] .card-face,
+.card[data-suit="D"] .card-face {
+    color: var(--card-text-red);
+}
+
+.card[data-suit="C"] .card-face,
+.card[data-suit="S"] .card-face {
+    color: var(--card-text-black);
+}
+
+/* Top-left rank and small suit */
+.card-corner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.1;
+}
+
+.card-rank {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(0.8rem, 2vw, 1.2rem);
+}
+
+.card-suit-small {
+    font-size: clamp(0.6rem, 1.5vw, 0.9rem);
+}
+
+/* Center giant suit */
+.card-center-suit {
+    align-self: center;
+    font-size: clamp(1.5rem, 3.5vw, 2.4rem);
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+/* Hover lift effect for playable cards */
+.card.playable:not(.face-down):hover {
+    transform: translateY(-6px);
+    box-shadow: var(--shadow-md);
+    z-index: 100 !important;
+}
+
+/* Dragging styles */
+.card.dragging {
+    opacity: 0.5 !important;
+    transform: scale(1.02) !important;
+    box-shadow: var(--shadow-sm) !important;
+    pointer-events: none;
+}
+
+/* Stacking on Tableau - absolute offsets */
+.tableau-column .card {
+    position: absolute;
+    /* top is calculated in JavaScript using style.top */
+}
+
+/* Stock / Waste stack styles */
+.stock-pile .card,
+.waste-pile .card,
+.foundation-pile .card {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Give top card in waste a slight offset for visual pile depth (optional, keeping flat for simplicity unless requested) */
+
+/* Drag Container (Floating Cards) */
+.drag-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+.drag-container .card {
+    position: absolute;
+    transform: scale(1.04) rotate(1deg) !important;
+    box-shadow: var(--shadow-card-drag) !important;
+    transition: none !important; /* Disables transitions while moving */
+}
+
+/* Highlights for dragging */
+.card.valid-target {
+    box-shadow: 0 0 10px var(--accent);
+}
+
+/* Modals & Overlays */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 15, 12, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+    z-index: 1000;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.modal-content {
+    background: rgba(25, 30, 26, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 40px;
+    border-radius: 24px;
+    width: 90%;
+    max-width: 450px;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    transform: scale(0.9);
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-overlay.active .modal-content {
+    transform: scale(1);
+}
+
+.win-trophy {
+    font-size: 4.5rem;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 0 12px var(--accent-glow));
+    animation: float 3s ease-in-out infinite;
+}
+
+.modal-content h2 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #ffffff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.win-desc {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 28px;
+}
+
+.win-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 35px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.win-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.win-stat-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.win-stat-value {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.15rem;
+    color: var(--text-primary);
+}
+
+.modal-content .btn-primary {
+    width: 100%;
+}
+
+/* Unsolvable Banner */
+.unsolvable-banner {
+    position: fixed;
+    bottom: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 25, 20, 0.9);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    padding: 12px 24px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 30px;
+    box-shadow: var(--shadow-lg);
+    z-index: 900;
+    width: 90%;
+    max-width: 550px;
+    transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.unsolvable-banner.active {
+    bottom: 24px;
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.banner-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.banner-text strong {
+    color: var(--warning);
+    display: block;
+    font-size: 0.9rem;
+    font-family: var(--font-display);
+}
+
+.banner-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Animations */
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+/* Responsive Scaling details */
+@media (max-width: 768px) {
+    .app-container {
+        padding: 12px;
+        gap: 14px;
+    }
+    
+    .game-header {
+        padding: 10px 16px;
+        border-radius: 12px;
+    }
+    
+    .logo-area h1 {
+        font-size: 1.4rem;
+    }
+    
+    .stats-panel {
+        gap: 14px;
+    }
+    
+    .stat-value {
+        font-size: 1.1rem;
+    }
+    
+    .game-board {
+        gap: 20px;
+    }
+    
+    .board-top-row {
+        gap: 10px;
+    }
+    
+    .deck-area, .foundations-area {
+        gap: 8px;
+    }
+    
+    .tableau-area {
+        gap: 8px;
+    }
+    
+    .pile, .tableau-column, .card {
+        border-radius: 6px;
+    }
+    
+    .card-face {
+        padding: 4px 6px;
+    }
+    
+    .card-rank {
+        font-size: 0.85rem;
+    }
+    
+    .card-suit-small {
+        font-size: 0.65rem;
+    }
+    
+    .card-center-suit {
+        font-size: 1.4rem;
+        margin-bottom: 4px;
+    }
+    
+    .unsolvable-banner {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+        text-align: center;
+        padding: 16px;
+    }
+    
+    .banner-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .banner-actions {
+        justify-content: center;
+    }
 }
