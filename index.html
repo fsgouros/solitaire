@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solitaire - Premium Klondike</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Background decorative elements -->
+        <div class="bg-glow bg-glow-1"></div>
+        <div class="bg-glow bg-glow-2"></div>
+
+        <!-- Header / HUD -->
+        <header class="game-header">
+            <div class="logo-area">
+                <h1>Solitaire</h1>
+                <span class="subtitle">Klondike</span>
+            </div>
+            
+            <div class="stats-panel">
+                <div class="stat-box">
+                    <span class="stat-label">TIME</span>
+                    <span class="stat-value" id="timer-val">00:00</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">MOVES</span>
+                    <span class="stat-value" id="moves-val">0</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">SCORE</span>
+                    <span class="stat-value" id="score-val">0</span>
+                </div>
+            </div>
+
+            <div class="status-indicator-wrapper">
+                <span class="status-dot green" id="status-dot"></span>
+                <span class="status-text" id="status-text">Analyzing board...</span>
+            </div>
+
+            <div class="control-panel">
+                <button class="btn btn-icon" id="undo-btn" title="Undo (Ctrl+Z)" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                </button>
+                <button class="btn btn-icon" id="redo-btn" title="Redo (Ctrl+Y)" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+                </button>
+                <button class="btn btn-icon" id="theme-btn" title="Toggle Theme">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                </button>
+                <button class="btn btn-primary" id="new-game-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    New Game
+                </button>
+            </div>
+        </header>
+
+        <!-- Game Board -->
+        <main class="game-board">
+            <!-- Top Row: Stock, Waste, Spacers, Foundations -->
+            <div class="board-top-row">
+                <div class="deck-area">
+                    <div class="pile-container">
+                        <span class="pile-label">STOCK</span>
+                        <div class="pile stock-pile" id="stock-pile">
+                            <!-- Cards will be rendered here -->
+                        </div>
+                    </div>
+                    
+                    <div class="pile-container">
+                        <span class="pile-label">WASTE</span>
+                        <div class="pile waste-pile" id="waste-pile">
+                            <!-- Cards will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="foundations-area">
+                    <div class="pile-container">
+                        <span class="pile-label">HEARTS</span>
+                        <div class="pile foundation-pile" id="foundation-0" data-suit="H">
+                            <div class="suit-placeholder red">♥</div>
+                        </div>
+                    </div>
+                    <div class="pile-container">
+                        <span class="pile-label">DIAMONDS</span>
+                        <div class="pile foundation-pile" id="foundation-1" data-suit="D">
+                            <div class="suit-placeholder red">♦</div>
+                        </div>
+                    </div>
+                    <div class="pile-container">
+                        <span class="pile-label">CLUBS</span>
+                        <div class="pile foundation-pile" id="foundation-2" data-suit="C">
+                            <div class="suit-placeholder black">♣</div>
+                        </div>
+                    </div>
+                    <div class="pile-container">
+                        <span class="pile-label">SPADES</span>
+                        <div class="pile foundation-pile" id="foundation-3" data-suit="S">
+                            <div class="suit-placeholder black">♠</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Tableau Columns -->
+            <div class="tableau-area" id="tableau-area">
+                <div class="tableau-column-wrapper">
+                    <span class="column-label">COL 1</span>
+                    <div class="tableau-column" id="tableau-0" data-index="0"></div>
+                </div>
+                <div class="tableau-column-wrapper">
+                    <span class="column-label">COL 2</span>
+                    <div class="tableau-column" id="tableau-1" data-index="1"></div>
+                </div>
+                <div class="tableau-column-wrapper">
+                    <span class="column-label">COL 3</span>
+                    <div class="tableau-column" id="tableau-2" data-index="2"></div>
+                </div>
+                <div class="tableau-column-wrapper">
+                    <span class="column-label">COL 4</span>
+                    <div class="tableau-column" id="tableau-3" data-index="3"></div>
+                </div>
+                <div class="tableau-column-wrapper">
+                    <span class="column-label">COL 5</span>
+                    <div class="tableau-column" id="tableau-4" data-index="4"></div>
+                </div>
+                <div class="tableau-column-wrapper">
+                    <span class="column-label">COL 6</span>
+                    <div class="tableau-column" id="tableau-5" data-index="5"></div>
+                </div>
+                <div class="tableau-column-wrapper">
+                    <span class="column-label">COL 7</span>
+                    <div class="tableau-column" id="tableau-6" data-index="6"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Win Modal -->
+    <div class="modal-overlay" id="win-modal">
+        <div class="modal-content glass-card animate-pop">
+            <div class="win-trophy">🏆</div>
+            <h2>Congratulations!</h2>
+            <p class="win-desc">You successfully solved the Solitaire deck.</p>
+            
+            <div class="win-stats">
+                <div class="win-stat">
+                    <span class="win-stat-label">Time Elapsed</span>
+                    <span class="win-stat-value" id="win-time">00:00</span>
+                </div>
+                <div class="win-stat">
+                    <span class="win-stat-label">Total Moves</span>
+                    <span class="win-stat-value" id="win-moves">0</span>
+                </div>
+                <div class="win-stat">
+                    <span class="win-stat-label">Final Score</span>
+                    <span class="win-stat-value" id="win-score">0</span>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary btn-large" id="play-again-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <!-- Unsolvable Modal (Non-intrusive notification first, but can expand) -->
+    <div class="unsolvable-banner" id="unsolvable-banner">
+        <div class="banner-content">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div class="banner-text">
+                <strong>No Moves Remaining!</strong> This board state appears to be unsolvable.
+            </div>
+        </div>
+        <div class="banner-actions">
+            <button class="btn btn-secondary btn-sm" id="banner-undo">Undo Move</button>
+            <button class="btn btn-warning btn-sm" id="banner-new">New Deal</button>
+        </div>
+    </div>
+
+    <!-- Dragging container (floating element when dragging) -->
+    <div id="drag-container" class="drag-container"></div>
+
+    <!-- Scripts -->
+    <script src="solver.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
