@@ -31,6 +31,7 @@ const state = {
 // Drag & Drop State
 const drag = {
     active: false,
+    isDragging: false,
     pointerId: null,
     startX: 0,
     startY: 0,
@@ -339,56 +340,151 @@ function drawCard() {
     runSolvabilityCheck();
 }
 
-// Check and perform double-click auto-move to foundations
-function handleDoubleClick(e) {
-    const cardEl = e.currentTarget;
-    const cardId = cardEl.id;
+// Try to auto-move a card to a legal spot (Foundation or Tableau)
+function tryAutoMove(cardId) {
+    if (state.isAnimating) return false;
+    
     const card = state.deck[cardId];
+    if (!card || !card.faceUp) return false;
     
-    if (!card.faceUp || state.isAnimating) return;
+    const sourcePile = findCardPile(cardId);
+    if (!sourcePile) return false;
     
-    // Find if this card is the top-most card in its pile
-    let sourcePile = findCardPile(cardId);
-    if (!sourcePile) return;
-    
-    // Only top cards of tableau or waste can be auto-moved
+    let cardsToMove = [];
     if (sourcePile.type === 'tableau') {
         const col = state.tableau[sourcePile.index];
-        if (col[col.length - 1] !== cardId) return; // Not top card
+        const cardIdx = col.indexOf(cardId);
+        if (cardIdx === -1) return false;
+        cardsToMove = col.slice(cardIdx);
+    } else if (sourcePile.type === 'waste') {
+        if (state.waste[state.waste.length - 1] !== cardId) return false;
+        cardsToMove = [cardId];
     } else if (sourcePile.type === 'foundation') {
-        return; // Already in foundation
+        const fPile = state.foundation[sourcePile.index];
+        if (fPile[fPile.length - 1] !== cardId) return false;
+        cardsToMove = [cardId];
     }
     
-    // Find valid foundation pile
+    if (cardsToMove.length === 0) return false;
+    
+    const movingCard = state.deck[cardsToMove[0]];
     const suits = ['H', 'D', 'C', 'S'];
-    for (let f = 0; f < 4; f++) {
-        const fPile = state.foundation[f];
-        const fSuit = suits[f];
-        if (Solver.isValidFoundationBuild(card, fPile.map(id => state.deck[id]), fSuit)) {
-            // Valid! Perform move
+    
+    // Priority 1: Move to Foundation (only allowed if moving a single card)
+    if (cardsToMove.length === 1 && sourcePile.type !== 'foundation') {
+        for (let f = 0; f < 4; f++) {
+            const fPile = state.foundation[f];
+            const fSuit = suits[f];
+            if (Solver.isValidFoundationBuild(movingCard, fPile.map(id => state.deck[id]), fSuit)) {
+                saveState();
+                
+                // Remove from source
+                if (sourcePile.type === 'tableau') {
+                    state.tableau[sourcePile.index].pop();
+                    autoFlipTopTableau(sourcePile.index);
+                } else if (sourcePile.type === 'waste') {
+                    state.waste.pop();
+                }
+                
+                // Add to foundation
+                state.foundation[f].push(cardId);
+                
+                state.moves++;
+                state.score += 10;
+                
+                updateStatsUI();
+                renderBoard(true);
+                checkGameWin();
+                runSolvabilityCheck();
+                return true;
+            }
+        }
+    }
+    
+    // Priority 2: Move to Tableau Column
+    const tableauTargets = [];
+    for (let t = 0; t < 7; t++) {
+        if (sourcePile.type === 'tableau' && sourcePile.index === t) continue;
+        tableauTargets.push(t);
+    }
+    
+    // Sort: non-empty tableau columns first, empty columns second
+    tableauTargets.sort((a, b) => {
+        const lenA = state.tableau[a].length;
+        const lenB = state.tableau[b].length;
+        if (lenA > 0 && lenB === 0) return -1;
+        if (lenA === 0 && lenB > 0) return 1;
+        return 0;
+    });
+    
+    for (const t of tableauTargets) {
+        const destCol = state.tableau[t];
+        let isValid = false;
+        
+        if (destCol.length === 0) {
+            // Kings can move to empty columns
+            if (movingCard.value === 13) {
+                if (sourcePile.type === 'tableau') {
+                    const srcCol = state.tableau[sourcePile.index];
+                    const srcCardIdx = srcCol.indexOf(cardId);
+                    // Skip if it's already the bottom-most card of a column with no face-down cards underneath
+                    const hasFaceDownBehind = srcCol.slice(0, srcCardIdx).some(id => !state.deck[id].faceUp);
+                    if (srcCardIdx === 0 && !hasFaceDownBehind) {
+                        isValid = false;
+                    } else {
+                        isValid = true;
+                    }
+                } else {
+                    isValid = true; // Waste or Foundation to empty column is valid
+                }
+            }
+        } else {
+            const targetCardId = destCol[destCol.length - 1];
+            const targetCard = state.deck[targetCardId];
+            isValid = Solver.isValidTableauBuild(movingCard, targetCard);
+        }
+        
+        if (isValid) {
             saveState();
             
             // Remove from source
             if (sourcePile.type === 'tableau') {
-                state.tableau[sourcePile.index].pop();
+                const col = state.tableau[sourcePile.index];
+                col.splice(col.length - cardsToMove.length, cardsToMove.length);
                 autoFlipTopTableau(sourcePile.index);
             } else if (sourcePile.type === 'waste') {
-                state.waste.pop();
+                state.waste.splice(state.waste.length - cardsToMove.length, cardsToMove.length);
+            } else if (sourcePile.type === 'foundation') {
+                state.foundation[sourcePile.index].pop();
             }
             
-            // Add to foundation
-            state.foundation[f].push(cardId);
+            // Add to destination
+            state.tableau[t] = state.tableau[t].concat(cardsToMove);
+            
+            // Score tracking
+            if (sourcePile.type === 'waste') {
+                state.score += 5;
+            } else if (sourcePile.type === 'foundation') {
+                state.score = Math.max(0, state.score - 15);
+            }
             
             state.moves++;
-            state.score += 10; // +10 points for foundation
-            
+            startTimer();
             updateStatsUI();
             renderBoard(true);
             checkGameWin();
             runSolvabilityCheck();
-            return;
+            return true;
         }
     }
+    
+    return false;
+}
+
+// Check and perform double-click auto-move
+function handleDoubleClick(e) {
+    const cardEl = e.currentTarget;
+    tryAutoMove(cardEl.id);
 }
 
 // Find which pile a card is currently in
@@ -441,10 +537,6 @@ function handlePointerDown(e) {
     
     // Can only drag face-up cards
     if (!card.faceUp) {
-        // If they click the stock pile top card, draw a card instead!
-        if (cardEl.parentElement === dom.stock) {
-            drawCard();
-        }
         return;
     }
     
@@ -473,7 +565,10 @@ function handlePointerDown(e) {
     
     // Set active drag state
     drag.active = true;
+    drag.isDragging = false;
     drag.pointerId = e.pointerId;
+    drag.startX = e.clientX;
+    drag.startY = e.clientY;
     drag.cards = draggedCards;
     drag.sourcePile = sourcePile;
     
@@ -521,14 +616,22 @@ function handlePointerDown(e) {
 function handlePointerMove(e) {
     if (!drag.active || drag.pointerId !== e.pointerId) return;
     
-    const x = e.clientX - drag.dragOffset.x;
-    const y = e.clientY - drag.dragOffset.y;
+    // Distance check to confirm user is dragging
+    const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+    if (dist > 4) {
+        drag.isDragging = true;
+    }
     
-    dom.dragContainer.style.left = `${x}px`;
-    dom.dragContainer.style.top = `${y}px`;
-    
-    // Visual feedback: Highlight potential drop targets
-    highlightPotentialTargets(e.clientX, e.clientY);
+    if (drag.isDragging) {
+        const x = e.clientX - drag.dragOffset.x;
+        const y = e.clientY - drag.dragOffset.y;
+        
+        dom.dragContainer.style.left = `${x}px`;
+        dom.dragContainer.style.top = `${y}px`;
+        
+        // Visual feedback: Highlight potential drop targets
+        highlightPotentialTargets(e.clientX, e.clientY);
+    }
 }
 
 function handlePointerUp(e) {
@@ -542,35 +645,54 @@ function handlePointerUp(e) {
     cardEl.removeEventListener('pointerup', handlePointerUp);
     cardEl.removeEventListener('pointercancel', handlePointerCancel);
     
-    // Find target pile
-    const targetPile = findDropTarget(e.clientX, e.clientY);
-    
-    let moveSuccessful = false;
-    
-    if (targetPile) {
-        moveSuccessful = executeDragMove(targetPile);
-    }
-    
-    if (!moveSuccessful) {
-        // Snap back with animation
-        snapBackCards();
+    if (drag.isDragging) {
+        // Find target pile
+        const targetPile = findDropTarget(e.clientX, e.clientY);
+        
+        let moveSuccessful = false;
+        
+        if (targetPile) {
+            moveSuccessful = executeDragMove(targetPile);
+        }
+        
+        if (!moveSuccessful) {
+            // Snap back with animation
+            snapBackCards();
+        } else {
+            // Move was successful, finalize state
+            drag.cards.forEach(id => {
+                cardDOMElements[id].classList.remove('dragging');
+            });
+            drag.active = false;
+            drag.isDragging = false;
+            
+            state.moves++;
+            startTimer();
+            updateStatsUI();
+            
+            checkGameWin();
+            runSolvabilityCheck();
+        }
+        
+        // Clean up highlights
+        clearHighlights();
     } else {
-        // Move was successful, finalize state
-        drag.cards.forEach(id => {
-            cardDOMElements[id].classList.remove('dragging');
+        // User tapped the card without dragging!
+        // Instantly restore cards to original parent before performing tap auto-move
+        drag.originalOffsets.forEach(orig => {
+            const el = cardDOMElements[orig.id];
+            el.classList.remove('dragging');
+            orig.parent.appendChild(el);
+            el.style.top = orig.top;
+            el.style.zIndex = orig.zIndex;
         });
+        
+        const tappedCardId = drag.cards[0];
         drag.active = false;
+        drag.isDragging = false;
         
-        state.moves++;
-        startTimer();
-        updateStatsUI();
-        
-        checkGameWin();
-        runSolvabilityCheck();
+        tryAutoMove(tappedCardId);
     }
-    
-    // Clean up highlights
-    clearHighlights();
 }
 
 function handlePointerCancel(e) {
@@ -580,8 +702,20 @@ function handlePointerCancel(e) {
     cardEl.removeEventListener('pointerup', handlePointerUp);
     cardEl.removeEventListener('pointercancel', handlePointerCancel);
     
-    snapBackCards();
-    clearHighlights();
+    if (drag.isDragging) {
+        snapBackCards();
+        clearHighlights();
+    } else {
+        drag.originalOffsets.forEach(orig => {
+            const el = cardDOMElements[orig.id];
+            el.classList.remove('dragging');
+            orig.parent.appendChild(el);
+            el.style.top = orig.top;
+            el.style.zIndex = orig.zIndex;
+        });
+        drag.active = false;
+        drag.isDragging = false;
+    }
 }
 
 // Highlights valid piles under the dragging pointer
@@ -1111,10 +1245,8 @@ function toggleTheme() {
 
 /* --- Event Binding --- */
 
-dom.stock.addEventListener('click', (e) => {
-    if (e.target === dom.stock && state.stock.length === 0) {
-        drawCard();
-    }
+dom.stock.addEventListener('click', () => {
+    drawCard();
 });
 
 dom.newGameBtn.addEventListener('click', () => {
