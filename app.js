@@ -64,6 +64,7 @@ const dom = {
     timer: document.getElementById('timer-val'),
     moves: document.getElementById('moves-val'),
     score: document.getElementById('score-val'),
+    hintBtn: document.getElementById('hint-btn'),
     undoBtn: document.getElementById('undo-btn'),
     redoBtn: document.getElementById('redo-btn'),
     themeBtn: document.getElementById('theme-btn'),
@@ -104,6 +105,7 @@ function initGame() {
     updateStatsUI();
     hideWinModal();
     hideUnsolvableBanner();
+    clearHintHighlights();
     
     // Create card objects
     const suits = ['H', 'D', 'C', 'S'];
@@ -314,6 +316,7 @@ function renderBoard(animate = true) {
 function drawCard() {
     if (state.isAnimating) return;
     
+    clearHintHighlights();
     saveState();
     
     if (state.stock.length > 0) {
@@ -530,6 +533,8 @@ function autoFlipTopTableau(colIndex) {
 function handlePointerDown(e) {
     // Only left click/primary pointer, and when not animating
     if (e.button !== 0 || state.isAnimating) return;
+    
+    clearHintHighlights();
     
     const cardEl = e.currentTarget;
     const cardId = cardEl.id;
@@ -952,6 +957,8 @@ function saveState() {
 function undo() {
     if (state.history.length === 0 || state.isAnimating) return;
     
+    clearHintHighlights();
+    
     // Save current state to redo stack
     const currentCopy = {
         deck: JSON.parse(JSON.stringify(state.deck)),
@@ -976,6 +983,8 @@ function undo() {
 
 function redo() {
     if (state.redoStack.length === 0 || state.isAnimating) return;
+    
+    clearHintHighlights();
     
     // Save current state to history
     const currentCopy = {
@@ -1140,6 +1149,12 @@ function triggerAutoSolve() {
             state.score += 10;
             state.moves++;
             moveMade = true;
+        } else if (nextMove.type === 'tableau_to_tableau') {
+            const { fromIndex, toIndex, cards } = nextMove;
+            state.tableau[fromIndex] = [];
+            state.tableau[toIndex] = state.tableau[toIndex].concat(cards);
+            state.moves++;
+            moveMade = true;
         } else if (nextMove.type === 'draw_card') {
             const cardId = state.stock.pop();
             state.deck[cardId].faceUp = true;
@@ -1229,6 +1244,76 @@ function launchConfettiCelebration() {
     }
 }
 
+/* --- Hint System --- */
+
+let hintTimeout = null;
+
+function showHint() {
+    clearHintHighlights();
+    
+    if (state.isAnimating) return;
+    
+    const move = Solver.getBestMove(state);
+    
+    if (!move) {
+        updateSolvabilityUI('unsolvable');
+        showUnsolvableBanner();
+        dom.statusText.textContent = 'No Hints Available! ⚠️';
+        return;
+    }
+    
+    // Highlight Source
+    if (move.fromType === 'tableau') {
+        const cardEl = cardDOMElements[move.cardId];
+        if (cardEl) cardEl.classList.add('hint-source');
+    } else if (move.fromType === 'waste') {
+        const cardEl = cardDOMElements[move.cardId];
+        if (cardEl) cardEl.classList.add('hint-source');
+        else dom.waste.classList.add('hint-source');
+    } else if (move.fromType === 'stock') {
+        dom.stock.classList.add('hint-source');
+    }
+    
+    // Highlight Target
+    if (move.toType === 'foundation') {
+        dom.foundations[move.toIndex].classList.add('hint-target');
+    } else if (move.toType === 'tableau') {
+        const colEl = dom.tableaus[move.toIndex];
+        const colCards = state.tableau[move.toIndex];
+        if (colCards.length > 0) {
+            const topCardId = colCards[colCards.length - 1];
+            const cardEl = cardDOMElements[topCardId];
+            if (cardEl) cardEl.classList.add('hint-target');
+            else colEl.classList.add('hint-target');
+        } else {
+            colEl.classList.add('hint-target');
+        }
+    } else if (move.toType === 'waste') {
+        dom.waste.classList.add('hint-target');
+    } else if (move.toType === 'stock') {
+        dom.stock.classList.add('hint-target');
+    }
+    
+    // Update status bar with move description
+    dom.statusText.textContent = `💡 ${move.description}`;
+    
+    // Auto clear hint highlights after 3.5 seconds
+    hintTimeout = setTimeout(() => {
+        clearHintHighlights();
+        runSolvabilityCheck();
+    }, 3500);
+}
+
+function clearHintHighlights() {
+    if (hintTimeout) {
+        clearTimeout(hintTimeout);
+        hintTimeout = null;
+    }
+    document.querySelectorAll('.hint-source, .hint-target').forEach(el => {
+        el.classList.remove('hint-source', 'hint-target');
+    });
+}
+
 /* --- Theme Handling --- */
 
 function toggleTheme() {
@@ -1255,6 +1340,7 @@ dom.newGameBtn.addEventListener('click', () => {
     }
 });
 
+dom.hintBtn.addEventListener('click', showHint);
 dom.undoBtn.addEventListener('click', undo);
 dom.redoBtn.addEventListener('click', redo);
 dom.themeBtn.addEventListener('click', toggleTheme);
@@ -1282,6 +1368,11 @@ document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         redo();
+    }
+    // H for Hint
+    if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        showHint();
     }
 });
 

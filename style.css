@@ -741,6 +741,33 @@ body {
     50% { transform: translateY(-10px); }
 }
 
+/* Hint Highlighting */
+.hint-source {
+    outline: 3px solid var(--accent) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 16px var(--accent-glow), 0 0 24px var(--accent) !important;
+    animation: hintPulse 1.2s infinite ease-in-out !important;
+    z-index: 500 !important;
+}
+
+.hint-target {
+    outline: 3px solid var(--success) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 16px rgba(52, 211, 153, 0.4), 0 0 24px var(--success) !important;
+    animation: hintPulse 1.2s infinite ease-in-out !important;
+}
+
+@keyframes hintPulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.05);
+        filter: brightness(1.25);
+    }
+}
+
 /* Responsive Scaling details */
 @media (max-width: 768px) {
     .app-container {

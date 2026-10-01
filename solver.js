@@ -32,36 +32,45 @@ const Solver = {
     },
 
     /**
-     * Checks if there are any valid moves remaining in the game.
+     * Format card into human-readable representation (e.g. ♥A, ♠K, ♦10)
+     */
+    getCardName(card) {
+        if (!card) return '';
+        const suitSymbols = { H: '♥', D: '♦', C: '♣', S: '♠' };
+        const rankLabels = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' };
+        const rankStr = rankLabels[card.value] || card.value.toString();
+        return `${suitSymbols[card.suit]}${rankStr}`;
+    },
+
+    /**
+     * Checks if there are any valid, productive moves remaining in the game.
      * @param {Object} state - The current game state
-     * @returns {boolean} True if moves are available, false if unsolvable
+     * @returns {boolean} True if useful moves are available, false if unsolvable
      */
     checkSolvability(state) {
         const { tableau, foundation, stock, waste, deck } = state;
+        const suits = ['H', 'D', 'C', 'S'];
         
         // 1. Check Tableau to Foundation moves
-        // Only the top card of a tableau column (last item in the array) can go to foundation
         for (let i = 0; i < 7; i++) {
             const col = tableau[i];
             if (col.length > 0) {
                 const card = deck[col[col.length - 1]];
                 for (let f = 0; f < 4; f++) {
                     const fPile = foundation[f];
-                    const fSuit = ['H', 'D', 'C', 'S'][f]; // Assuming foundations are mapped this way
+                    const fSuit = suits[f];
                     if (this.isValidFoundationBuild(card, fPile.map(id => deck[id]), fSuit)) {
-                        return true; // Can move tableau card to foundation
+                        return true;
                     }
                 }
             }
         }
 
-        // 2. Check Tableau to Tableau moves
-        // Any face-up card (and the stack below it) can be moved to another column
+        // 2. Check Tableau to Tableau moves (Filter out useless cyclic moves)
         for (let srcIdx = 0; srcIdx < 7; srcIdx++) {
             const srcCol = tableau[srcIdx];
             if (srcCol.length === 0) continue;
 
-            // Find the index of the first face-up card in this column
             let firstFaceUpIdx = -1;
             for (let k = 0; k < srcCol.length; k++) {
                 if (deck[srcCol[k]].faceUp) {
@@ -69,34 +78,57 @@ const Solver = {
                     break;
                 }
             }
-
             if (firstFaceUpIdx === -1) continue;
 
-            // We can try to move any stack starting from firstFaceUpIdx to the end of the column
-            for (let k = firstFaceUpIdx; k < srcCol.length; k++) {
-                const cardToMove = deck[srcCol[k]];
-                
-                // Try to place it on any other column
-                for (let destIdx = 0; destIdx < 7; destIdx++) {
-                    if (srcIdx === destIdx) continue;
-                    
-                    const destCol = tableau[destIdx];
-                    if (destCol.length === 0) {
-                        // Can move a King to an empty column
-                        // Exception: Moving a King that is already the bottom-most card of its column
-                        // and has no face-down cards under it is a useless move (doesn't progress the game)
-                        if (cardToMove.value === 13 && k > 0) {
-                            return true; 
+            // Check moving the entire face-up stack starting at firstFaceUpIdx
+            const cardToMove = deck[srcCol[firstFaceUpIdx]];
+            for (let destIdx = 0; destIdx < 7; destIdx++) {
+                if (srcIdx === destIdx) continue;
+                const destCol = tableau[destIdx];
+
+                if (destCol.length === 0) {
+                    // Moving a King to an empty column is useful if it exposes a face-down card
+                    if (cardToMove.value === 13 && firstFaceUpIdx > 0) {
+                        return true;
+                    }
+                } else {
+                    const targetCard = deck[destCol[destCol.length - 1]];
+                    if (this.isValidTableauBuild(cardToMove, targetCard)) {
+                        // Moving stack is useful if:
+                        // a) It reveals a face-down card (firstFaceUpIdx > 0)
+                        // b) It clears the source column completely (firstFaceUpIdx === 0 and non-King)
+                        if (firstFaceUpIdx > 0) {
+                            return true;
                         }
-                    } else {
-                        const targetCard = deck[destCol[destCol.length - 1]];
-                        // Only the top card of a moving stack needs to match the target card
-                        if (k === firstFaceUpIdx || k === srcCol.length - 1) {
-                            // Normally we move the entire face-up stack. 
-                            // In some cases we might split a stack, but in Klondike, you usually move the whole face-up stack.
-                            // Let's check if the card at 'k' can be placed on 'targetCard'
-                            if (this.isValidTableauBuild(cardToMove, targetCard)) {
-                                // If it's a split move, is it useful? Yes, if it exposes a face-down card or frees a column.
+                        if (firstFaceUpIdx === 0 && cardToMove.value !== 13) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Check if splitting a stack (at k > firstFaceUpIdx) allows the newly exposed card at k-1 to go to Foundation
+            for (let k = firstFaceUpIdx + 1; k < srcCol.length; k++) {
+                const subCardToMove = deck[srcCol[k]];
+                const exposedCard = deck[srcCol[k - 1]];
+
+                let exposedCanGoToFoundation = false;
+                for (let f = 0; f < 4; f++) {
+                    const fPile = foundation[f];
+                    const fSuit = suits[f];
+                    if (this.isValidFoundationBuild(exposedCard, fPile.map(id => deck[id]), fSuit)) {
+                        exposedCanGoToFoundation = true;
+                        break;
+                    }
+                }
+
+                if (exposedCanGoToFoundation) {
+                    for (let destIdx = 0; destIdx < 7; destIdx++) {
+                        if (srcIdx === destIdx) continue;
+                        const destCol = tableau[destIdx];
+                        if (destCol.length > 0) {
+                            const targetCard = deck[destCol[destCol.length - 1]];
+                            if (this.isValidTableauBuild(subCardToMove, targetCard)) {
                                 return true;
                             }
                         }
@@ -109,34 +141,28 @@ const Solver = {
         if (waste.length > 0) {
             const wasteCard = deck[waste[waste.length - 1]];
             
-            // Can it go to Tableau?
             for (let i = 0; i < 7; i++) {
                 const col = tableau[i];
                 if (col.length === 0) {
-                    if (wasteCard.value === 13) return true; // King to empty
+                    if (wasteCard.value === 13) return true;
                 } else {
                     const targetCard = deck[col[col.length - 1]];
                     if (this.isValidTableauBuild(wasteCard, targetCard)) return true;
                 }
             }
             
-            // Can it go to Foundation?
             for (let f = 0; f < 4; f++) {
                 const fPile = foundation[f];
-                const fSuit = ['H', 'D', 'C', 'S'][f];
+                const fSuit = suits[f];
                 if (this.isValidFoundationBuild(wasteCard, fPile.map(id => deck[id]), fSuit)) return true;
             }
         }
 
         // 4. Check Stock Pile (and rest of Waste)
-        // If there are cards in the stock, we can draw. 
-        // But drawing is only useful if some card in the stock/waste can eventually be played.
-        // Let's check if ANY card in the stock or waste can be played on the current board state.
         const deckCardsToCheck = [...stock, ...waste];
         for (const cardId of deckCardsToCheck) {
             const card = deck[cardId];
             
-            // Can this card be played on any tableau?
             for (let i = 0; i < 7; i++) {
                 const col = tableau[i];
                 if (col.length === 0) {
@@ -147,47 +173,248 @@ const Solver = {
                 }
             }
             
-            // Can this card be played on any foundation?
             for (let f = 0; f < 4; f++) {
                 const fPile = foundation[f];
-                const fSuit = ['H', 'D', 'C', 'S'][f];
+                const fSuit = suits[f];
                 if (this.isValidFoundationBuild(card, fPile.map(id => deck[id]), fSuit)) return true;
             }
         }
 
-        // If we reach here, absolutely no moves are possible
         return false;
     },
 
     /**
+     * Evaluates all legal moves and returns the best recommended next move.
+     * @param {Object} state - The current game state
+     * @returns {Object|null} Move recommendation object or null if no moves
+     */
+    getBestMove(state) {
+        const { tableau, foundation, stock, waste, deck } = state;
+        const suits = ['H', 'D', 'C', 'S'];
+
+        // 1. Priority 1: Tableau to Foundation
+        for (let i = 0; i < 7; i++) {
+            const col = tableau[i];
+            if (col.length > 0) {
+                const cardId = col[col.length - 1];
+                const card = deck[cardId];
+                for (let f = 0; f < 4; f++) {
+                    const fPile = foundation[f];
+                    const fSuit = suits[f];
+                    if (this.isValidFoundationBuild(card, fPile.map(id => deck[id]), fSuit)) {
+                        return {
+                            type: 'tableau_to_foundation',
+                            fromType: 'tableau',
+                            fromIndex: i,
+                            toType: 'foundation',
+                            toIndex: f,
+                            cardId: cardId,
+                            description: `Move ${this.getCardName(card)} to Foundation`
+                        };
+                    }
+                }
+            }
+        }
+
+        // 2. Priority 2: Waste to Foundation
+        if (waste.length > 0) {
+            const cardId = waste[waste.length - 1];
+            const card = deck[cardId];
+            for (let f = 0; f < 4; f++) {
+                const fPile = foundation[f];
+                const fSuit = suits[f];
+                if (this.isValidFoundationBuild(card, fPile.map(id => deck[id]), fSuit)) {
+                    return {
+                        type: 'waste_to_foundation',
+                        fromType: 'waste',
+                        fromIndex: 0,
+                        toType: 'foundation',
+                        toIndex: f,
+                        cardId: cardId,
+                        description: `Move ${this.getCardName(card)} to Foundation`
+                    };
+                }
+            }
+        }
+
+        // 3. Priority 3: Tableau to Tableau that reveals a face-down card
+        for (let srcIdx = 0; srcIdx < 7; srcIdx++) {
+            const srcCol = tableau[srcIdx];
+            if (srcCol.length === 0) continue;
+
+            let firstFaceUpIdx = -1;
+            for (let k = 0; k < srcCol.length; k++) {
+                if (deck[srcCol[k]].faceUp) {
+                    firstFaceUpIdx = k;
+                    break;
+                }
+            }
+            if (firstFaceUpIdx <= 0) continue; // Must have face-down cards underneath to reveal
+
+            const cardId = srcCol[firstFaceUpIdx];
+            const movingCard = deck[cardId];
+
+            for (let destIdx = 0; destIdx < 7; destIdx++) {
+                if (srcIdx === destIdx) continue;
+                const destCol = tableau[destIdx];
+
+                if (destCol.length === 0) {
+                    if (movingCard.value === 13) {
+                        return {
+                            type: 'tableau_to_tableau',
+                            fromType: 'tableau',
+                            fromIndex: srcIdx,
+                            toType: 'tableau',
+                            toIndex: destIdx,
+                            cardId: cardId,
+                            description: `Move ${this.getCardName(movingCard)} to empty Column ${destIdx + 1}`
+                        };
+                    }
+                } else {
+                    const targetCard = deck[destCol[destCol.length - 1]];
+                    if (this.isValidTableauBuild(movingCard, targetCard)) {
+                        return {
+                            type: 'tableau_to_tableau',
+                            fromType: 'tableau',
+                            fromIndex: srcIdx,
+                            toType: 'tableau',
+                            toIndex: destIdx,
+                            cardId: cardId,
+                            description: `Move ${this.getCardName(movingCard)} onto ${this.getCardName(targetCard)}`
+                        };
+                    }
+                }
+            }
+        }
+
+        // 4. Priority 4: Waste to Tableau
+        if (waste.length > 0) {
+            const cardId = waste[waste.length - 1];
+            const wasteCard = deck[cardId];
+
+            for (let destIdx = 0; destIdx < 7; destIdx++) {
+                const destCol = tableau[destIdx];
+                if (destCol.length > 0) {
+                    const targetCard = deck[destCol[destCol.length - 1]];
+                    if (this.isValidTableauBuild(wasteCard, targetCard)) {
+                        return {
+                            type: 'waste_to_tableau',
+                            fromType: 'waste',
+                            fromIndex: 0,
+                            toType: 'tableau',
+                            toIndex: destIdx,
+                            cardId: cardId,
+                            description: `Move ${this.getCardName(wasteCard)} onto ${this.getCardName(targetCard)}`
+                        };
+                    }
+                }
+            }
+
+            if (wasteCard.value === 13) {
+                for (let destIdx = 0; destIdx < 7; destIdx++) {
+                    if (tableau[destIdx].length === 0) {
+                        return {
+                            type: 'waste_to_tableau',
+                            fromType: 'waste',
+                            fromIndex: 0,
+                            toType: 'tableau',
+                            toIndex: destIdx,
+                            cardId: cardId,
+                            description: `Move ${this.getCardName(wasteCard)} to empty Column ${destIdx + 1}`
+                        };
+                    }
+                }
+            }
+        }
+
+        // 5. Priority 5: Tableau to Tableau that empties a column (frees spot for King)
+        for (let srcIdx = 0; srcIdx < 7; srcIdx++) {
+            const srcCol = tableau[srcIdx];
+            if (srcCol.length === 0) continue;
+
+            let firstFaceUpIdx = -1;
+            for (let k = 0; k < srcCol.length; k++) {
+                if (deck[srcCol[k]].faceUp) {
+                    firstFaceUpIdx = k;
+                    break;
+                }
+            }
+
+            if (firstFaceUpIdx === 0) {
+                const cardId = srcCol[0];
+                const movingCard = deck[cardId];
+                if (movingCard.value === 13) continue; // Moving King from empty base is redundant
+
+                for (let destIdx = 0; destIdx < 7; destIdx++) {
+                    if (srcIdx === destIdx) continue;
+                    const destCol = tableau[destIdx];
+
+                    if (destCol.length > 0) {
+                        const targetCard = deck[destCol[destCol.length - 1]];
+                        if (this.isValidTableauBuild(movingCard, targetCard)) {
+                            return {
+                                type: 'tableau_to_tableau',
+                                fromType: 'tableau',
+                                fromIndex: srcIdx,
+                                toType: 'tableau',
+                                toIndex: destIdx,
+                                cardId: cardId,
+                                description: `Move ${this.getCardName(movingCard)} onto ${this.getCardName(targetCard)} to clear Column ${srcIdx + 1}`
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. Priority 6: Draw Card from Stock
+        if (stock.length > 0) {
+            return {
+                type: 'draw_stock',
+                fromType: 'stock',
+                fromIndex: 0,
+                toType: 'waste',
+                toIndex: 0,
+                description: 'Draw a card from Stock'
+            };
+        }
+
+        // 7. Priority 7: Recycle Waste to Stock
+        if (waste.length > 0) {
+            return {
+                type: 'recycle_waste',
+                fromType: 'waste',
+                fromIndex: 0,
+                toType: 'stock',
+                toIndex: 0,
+                description: 'Recycle Waste pile back to Stock'
+            };
+        }
+
+        return null;
+    },
+
+    /**
      * Checks if the game is ready for Auto-Solve.
-     * Auto-solve is available when all cards in the tableau are face-up,
-     * and there are no face-down cards remaining (stock/waste can still have cards,
-     * we will just auto-play them).
+     * Auto-solve is available when all cards in the tableau are face-up.
      */
     canAutoSolve(state) {
         const { tableau, deck } = state;
-        
-        // Check if there are any face-down cards in the tableau
         for (let i = 0; i < 7; i++) {
             for (const cardId of tableau[i]) {
                 if (!deck[cardId].faceUp) return false;
             }
         }
-        
-        // If all cards in the tableau are face-up, we can auto-solve
         return true;
     },
 
     /**
      * Finds the next single move to perform during Auto-Solve.
-     * Returns an object describing the move, or null if no move can be made.
      */
     findNextAutoSolveMove(state) {
         const { tableau, foundation, stock, waste, deck } = state;
         const suits = ['H', 'D', 'C', 'S'];
 
-        // Helper to check if a card can go to a foundation
         const getTargetFoundationIndex = (card) => {
             for (let f = 0; f < 4; f++) {
                 const fPile = foundation[f];
@@ -231,20 +458,43 @@ const Solver = {
             }
         }
 
-        // 3. If no cards can go to foundation, but we have cards in stock/waste,
-        // we should draw a card to reveal more, or cycle the deck.
+        // 3. Try Tableau to Tableau move if it unblocks cards
+        for (let i = 0; i < 7; i++) {
+            const col = tableau[i];
+            if (col.length > 0) {
+                const cardId = col[0];
+                const card = deck[cardId];
+                if (card.value === 13) continue;
+                for (let t = 0; t < 7; t++) {
+                    if (i === t) continue;
+                    const destCol = tableau[t];
+                    if (destCol.length > 0) {
+                        const targetCard = deck[destCol[destCol.length - 1]];
+                        if (this.isValidTableauBuild(card, targetCard)) {
+                            return {
+                                type: 'tableau_to_tableau',
+                                fromIndex: i,
+                                toIndex: t,
+                                cards: [...col]
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Draw card or recycle waste
         if (stock.length > 0) {
             return {
                 type: 'draw_card'
             };
         } else if (waste.length > 0) {
-            // If stock is empty but waste has cards, recycle them
             return {
                 type: 'recycle_waste'
             };
         }
 
-        return null; // No more moves (should not happen if game is winnable and we are auto-solving)
+        return null;
     }
 };
 
